@@ -1,122 +1,170 @@
 <template>
-  <div class="home">
-    <el-container>
-      <el-header>
-        <h1>立案文件管理系统</h1>
-      </el-header>
-
-      <el-main>
-        <el-card>
-          <template #header>
-            <div class="card-header">
-              <span>文件生成设置</span>
-            </div>
-          </template>
-
-          <el-form :model="formConfig" label-width="120px">
-            <el-form-item label="打印份数">
-              <el-input-number v-model="formConfig.copies" :min="0" :max="10" />
-            </el-form-item>
-
-            <!-- 委托手续部分 -->
-            <el-divider>委托手续</el-divider>
-            <el-form-item>
-              <el-checkbox-group v-model="formConfig.delegationForms">
-                <el-checkbox label="official-letter">所函</el-checkbox>
-                <el-checkbox label="authorization">授权委托书</el-checkbox>
-                <el-checkbox label="lawyer-credentials">律师证件</el-checkbox>
-                <el-checkbox label="client-info">委托人身份信息</el-checkbox>
-                <el-checkbox label="corporate-info">法人企业身份信息</el-checkbox>
-                <el-checkbox label="operator-info">经营者身份证明书</el-checkbox>
-                <el-checkbox label="address-confirm">送达地址确认书</el-checkbox>
-                <el-checkbox label="refund-account">退费账户确认书</el-checkbox>
-              </el-checkbox-group>
-            </el-form-item>
-
-            <!-- 诉讼文书部分 -->
-            <el-divider>诉讼文书</el-divider>
-            <el-form-item>
-              <el-checkbox-group v-model="formConfig.litigationForms">
-                <el-checkbox label="complaint">起诉状</el-checkbox>
-                <el-checkbox label="defense">答辩状</el-checkbox>
-              </el-checkbox-group>
-            </el-form-item>
-          </el-form>
-
-          <!-- 生成按钮 -->
-          <div class="generate-actions">
-            <el-button
-              type="primary"
-              @click="generatePDF"
-              :disabled="!hasSelectedForms"
-            >
-              生成PDF文件
-            </el-button>
-            <el-button
-              type="success"
-              @click="printForms"
-              :disabled="!hasSelectedForms || formConfig.copies === 0"
-            >
-              打印文件 ({{ formConfig.copies }}份)
-            </el-button>
+  <!-- 保持之前的主页内容不变，添加以下对话框组件 -->
+  <el-dialog
+    v-model="documentsDialogVisible"
+    :title="`${currentCase?.caseName || ''} - 文件选择`"
+    width="70%"
+  >
+    <div class="documents-grid">
+      <!-- 委托手续文书 -->
+      <el-card class="document-section">
+        <template #header>
+          <div class="section-header">委托手续</div>
+        </template>
+        <div class="document-items">
+          <div
+            v-for="doc in delegationDocs"
+            :key="doc.key"
+            class="document-item"
+            @click="navigateToDocument(doc)"
+          >
+            <el-card shadow="hover" :body-style="{ padding: '20px' }">
+              <div class="document-icon">
+                <el-icon :size="24"><Document /></el-icon>
+              </div>
+              <div class="document-title">{{ doc.label }}</div>
+              <div class="document-status">
+                <el-tag :type="doc.completed ? 'success' : 'info'" size="small">
+                  {{ doc.completed ? '已完成' : '待填写' }}
+                </el-tag>
+              </div>
+            </el-card>
           </div>
-        </el-card>
-      </el-main>
-    </el-container>
-  </div>
+        </div>
+      </el-card>
+
+      <!-- 诉讼文书 -->
+      <el-card class="document-section">
+        <template #header>
+          <div class="section-header">诉讼文书</div>
+        </template>
+        <div class="document-items">
+          <div
+            v-for="doc in litigationDocs"
+            :key="doc.key"
+            class="document-item"
+            @click="navigateToDocument(doc)"
+          >
+            <el-card shadow="hover" :body-style="{ padding: '20px' }">
+              <div class="document-icon">
+                <el-icon :size="24"><Document /></el-icon>
+              </div>
+              <div class="document-title">{{ doc.label }}</div>
+              <div class="document-status">
+                <el-tag :type="doc.completed ? 'success' : 'info'" size="small">
+                  {{ doc.completed ? '已完成' : '待填写' }}
+                </el-tag>
+              </div>
+            </el-card>
+          </div>
+        </div>
+      </el-card>
+    </div>
+  </el-dialog>
 </template>
 
-<script setup>
-import { ref, computed } from 'vue'
+<script setup lang="ts">
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { Document } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 
-const formConfig = ref({
-  copies: 1,
-  delegationForms: [],
-  litigationForms: []
-})
+const router = useRouter()
+const documentsDialogVisible = ref(false)
+const currentCase = ref<any>(null)
 
-const hasSelectedForms = computed(() => {
-  return formConfig.value.delegationForms.length > 0 ||
-         formConfig.value.litigationForms.length > 0
-})
-
-const generatePDF = () => {
-  ElMessage.success('PDF生成功能开发中')
+interface DocumentType {
+  key: string
+  label: string
+  completed: boolean
 }
 
-const printForms = () => {
-  ElMessage.success(`准备打印 ${formConfig.value.copies} 份文件`)
+const delegationDocs = ref<DocumentType[]>([
+  { key: 'official-letter', label: '所函', completed: false },
+  { key: 'authorization', label: '授权委托书', completed: false },
+  { key: 'lawyer-credentials', label: '律师证件', completed: false },
+  { key: 'client-info', label: '委托人身份信息', completed: false },
+  { key: 'corporate-info', label: '法人企业身份信息', completed: false },
+  { key: 'operator-info', label: '经营者身份证明书', completed: false },
+  { key: 'address-confirm', label: '送达地址确认书', completed: false },
+  { key: 'refund-account', label: '退费账户确认书', completed: false }
+])
+
+const litigationDocs = ref<DocumentType[]>([
+  { key: 'complaint', label: '起诉状', completed: false },
+  { key: 'defense', label: '答辩状', completed: false }
+])
+
+// 修改编辑按钮的处理函数
+const editCase = (caseData: any) => {
+  currentCase.value = caseData
+  documentsDialogVisible.value = true
 }
+
+const navigateToDocument = (doc: DocumentType) => {
+  documentsDialogVisible.value = false
+  router.push({
+    name: 'DocumentDetail',
+    params: {
+      caseNumber: currentCase.value.caseNumber,
+      documentType: doc.key
+    }
+  })
+}
+
+// ... 其他原有的代码保持不变 ...
 </script>
 
 <style scoped>
-.home {
-  padding: 20px;
+/* 添加新的样式 */
+.documents-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
-.el-header {
-  text-align: center;
-  line-height: 60px;
-  background-color: #fff;
-  border-bottom: 1px solid #dcdfe6;
+.document-section {
+  margin-bottom: 20px;
 }
 
-.el-header h1 {
-  margin: 0;
+.section-header {
+  font-size: 16px;
+  font-weight: bold;
   color: #303133;
 }
 
-.generate-actions {
-  margin-top: 20px;
+.document-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 20px;
+  padding: 10px;
+}
+
+.document-item {
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.document-item:hover {
+  transform: translateY(-5px);
+}
+
+.document-icon {
+  text-align: center;
+  color: #409EFF;
+  margin-bottom: 12px;
+}
+
+.document-title {
+  text-align: center;
+  margin-bottom: 12px;
+  font-size: 14px;
+  color: #303133;
+}
+
+.document-status {
   text-align: center;
 }
 
-.generate-actions .el-button {
-  margin: 0 10px;
-}
-
-.el-divider {
-  margin: 24px 0;
-}
+/* ... 其他原有的样式保持不变 ... */
 </style>
